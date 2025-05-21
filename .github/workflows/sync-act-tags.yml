@@ -1,0 +1,32 @@
+name: Sync Act Tags
+on:
+  schedule:
+    - cron: '0 0 * * *' # every day at midnight
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: |
+          latest_gh_act_release_tag="$(gh release list                    --json isLatest,tagName --jq '.[] | select(.isLatest).tagName')"
+          latest_act_release_tag="$(   gh release list --repo nektos/act  --json isLatest,tagName --jq '.[] | select(.isLatest).tagName')"
+          
+          echo "latest gh-act release tag: $latest_gh_act_release_tag"
+          echo "latest act    release tag: $latest_act_release_tag"
+          
+          if [ "$latest_gh_act_release_tag" != "$latest_act_release_tag" ]
+          then  
+            echo "Creating gh-act release tag $latest_act_release_tag"  
+            gh api -X POST /repos/${{ github.repository }}/git/refs \
+            --field ref=refs/tags/${latest_act_release_tag} \
+            --field sha=$(git rev-parse HEAD)
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          
